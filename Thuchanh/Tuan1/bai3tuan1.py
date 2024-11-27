@@ -63,43 +63,55 @@ class FacebookGroupScraper:
         try:
             self.driver.get(f"https://www.facebook.com/groups/{self.group_id}/members")
             time.sleep(5)
-            members = set()
+
+            members = []
+
             for i in range(self.scroll_count):
+
                 self.driver.execute_script(
                     "window.scrollTo(0, document.body.scrollHeight);"
                 )
                 time.sleep(3)
-                print(f"Scroll lan {i+1}/{self.scroll_count}")
+                print(f"Scroll lần {i + 1}/{self.scroll_count}")
 
-                # thu thap thong tin thanh vien moi lan scroll
                 user_elements = self.driver.find_elements(
                     By.CSS_SELECTOR, "a[href*='/user/']"
                 )
-                print(len(user_elements))
+                print(f"Tìm thấy {len(user_elements)} thẻ <a> trong lần scroll {i + 1}")
+
                 for user in user_elements:
                     try:
-                        href = user.get_attribute("href")
+                        href = user.get_dom_attribute("href")  # Lấy đường dẫn
+                        name = user.text.strip()  # Lấy tên từ nội dung thẻ <a>
+
                         if "/user/" in href:
-                            user_id = href.split("/user/")[1]
-                            name = user.text
-                            members.add((user_id, name))
-                            print(user_id, " - ", name)
+                            user_id = href.split("/user/")[1].strip("/")
+
+                            # Loại bỏ userID không hợp lệ hoặc nếu name rỗng
+                            if "/" in user_id or not user_id.isdigit() or not name:
+                                continue
+
+                            # Kiểm tra trùng lặp trước khi thêm vào danh sách
+                            if not any(
+                                member["userID"] == user_id for member in members
+                            ):
+                                members.append({"userID": user_id, "name": name})
+                                print(f"Thêm thành viên: {user_id} - {name}")
                     except Exception as e:
-                        pass
-            return list(members)
+                        print(f"Lỗi khi xử lý thẻ <a>: {e}")
+
+            return members
         except Exception as e:
-            pass
+            print(f"Lỗi trong hàm get_group_members: {e}")
+            return []
 
-    def export_to_excel(self, members, output_file="FacebookGroupMembers.xlsx"):
+    def export_to_excel(
+        self, members, output_file="FacebookGroupMembers_Cfduongpho.xlsx"
+    ):
         try:
-            # Kiểm tra xem members là list chứa tuple (user_id, name)
-            if isinstance(members, list):
-                # Tạo DataFrame từ danh sách
-                df = pd.DataFrame(members, columns=["User ID", "Name"])
-            else:
-                raise ValueError("Dữ liệu phải là list các tuple hoặc dictionary.")
 
-            # Ghi DataFrame ra file Excel
+            df = pd.DataFrame(members)
+
             df.to_excel(output_file, index=False)
             print(f"Dữ liệu đã được xuất ra file: {output_file}")
         except Exception as e:
